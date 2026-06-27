@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RPLE — Nayax Inventory</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/dist/tabler-icons.min.css" />
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
   <style>
     :root {
       --bg:#f5f5f3;--surface:#fff;--surface-2:#f9f9f8;--border:rgba(0,0,0,0.1);--border-strong:rgba(0,0,0,0.18);
@@ -32,9 +32,7 @@
     .main{padding:16px;max-width:480px;margin:0 auto}
     .view{display:none}.view.active{display:block}
     .scanner-wrapper{background:var(--surface-2);border:0.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px}
-    #qr-reader{width:100% !important;border:none !important}
-    #qr-reader video{border-radius:0 !important;width:100% !important}
-    #qr-reader img{display:none !important}
+    #zxing-video{width:100%;display:none;border-radius:0;min-height:240px;object-fit:cover;background:#000}
     .scan-placeholder{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;cursor:pointer}
     .scan-icon{width:80px;height:80px;position:relative}
     .corner{position:absolute;width:18px;height:18px}
@@ -110,7 +108,7 @@
         </div>
         <p>Toque para escanear o barcode</p>
       </div>
-      <div id="qr-reader" style="display:none"></div>
+      <video id="zxing-video" playsinline muted></video>
     </div>
     <button id="btn-toggle-scan" class="btn-scan" onclick="toggleScan()">
       <i class="ti ti-scan"></i> Abrir câmera
@@ -152,7 +150,7 @@
 <div class="toast" id="toast"></div>
 <script>
 const STORAGE_KEY='rple-nayax-v1';
-let devices=[],currentFilter='all',scanner=null,scannerRunning=false;
+let devices=[],currentFilter='all',codeReader=null,scannerRunning=false;
 
 function load(){try{devices=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch(e){devices=[]}}
 function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(devices))}
@@ -173,21 +171,50 @@ async function toggleScan(){scannerRunning?stopScan():startScan()}
 async function startScan(){
   if(scannerRunning)return;
   document.getElementById('scan-placeholder').style.display='none';
-  document.getElementById('qr-reader').style.display='block';
+  const video=document.getElementById('zxing-video');
+  video.style.display='block';
   const btn=document.getElementById('btn-toggle-scan');
   btn.innerHTML='<i class="ti ti-x"></i> Fechar câmera';
   btn.classList.add('stop');
   try{
-    scanner=new Html5Qrcode('qr-reader');
-    const cameras=await Html5Qrcode.getCameras();
-    if(!cameras||!cameras.length){toast('Nenhuma câmera encontrada');stopScan();return}
-    const cam=cameras.find(c=>/back|rear|environment/i.test(c.label))||cameras[cameras.length-1];
-    await scanner.start(cam.id,{fps:10,qrbox:{width:250,height:150},aspectRatio:1.5},
-      (code)=>{document.getElementById('sn').value=code;toast('Código lido: '+code);stopScan()},
-      ()=>{}
-    );
+    const hints=new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+      ZXing.BarcodeFormat.CODE_128,ZXing.BarcodeFormat.CODE_39,ZXing.BarcodeFormat.CODE_93,
+      ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.ITF,ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.DATA_MATRIX,ZXing.BarcodeFormat.PDF_417,ZXing.BarcodeFormat.AZTEC,
+    ]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+    codeReader=new ZXing.BrowserMultiFormatReader(hints,{delayBetweenScanAttempts:80});
+    const camList=await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+    if(!camList||!camList.length){toast('Nenhuma câmera encontrada');stopScan();return}
+    const cam=camList.find(d=>/back|rear|environment/i.test(d.label))||camList[camList.length-1];
+    await codeReader.decodeFromVideoDevice(cam.deviceId,'zxing-video',(result,err)=>{
+      if(result){
+        document.getElementById('sn').value=result.getText();
+        toast('Lido: '+result.getText());
+        stopScan();
+      }
+    });
     scannerRunning=true;
-  }catch(err){toast('Câmera bloqueada — verifique as permissões do navegador');stopScan()}
+  }catch(err){
+    console.error(err);
+    toast('Câmera bloqueada — verifique as permissões');
+    stopScan();
+  }
+}
+
+async function stopScan(){
+  if(codeReader){try{codeReader.reset()}catch(e){}}
+  codeReader=null;scannerRunning=false;
+  const video=document.getElementById('zxing-video');
+  if(video.srcObject){video.srcObject.getTracks().forEach(t=>t.stop());video.srcObject=null}
+  video.style.display='none';
+  document.getElementById('scan-placeholder').style.display='flex';
+  const btn=document.getElementById('btn-toggle-scan');
+  btn.innerHTML='<i class="ti ti-scan"></i> Abrir câmera';
+  btn.classList.remove('stop');
 }
 
 async function stopScan(){
