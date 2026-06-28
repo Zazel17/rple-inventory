@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RPLE — Nayax Inventory</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/dist/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hdr-logo">RP</div>
+  <div>
+    <h1>Nayax Inventory</h1>
+    <sub>RPLE — Gold Coast</sub>
+  </div>
+</header>
+
+<!-- ── Tabs ────────────────────────────────────────────────── -->
+<nav class="tabs">
+  <button class="tab active" onclick="switchTab('register', this)">
+    <i class="ti ti-plus"></i> Register
+  </button>
+  <button class="tab" onclick="switchTab('inventory', this)">
+    <i class="ti ti-list"></i> Inventory
+  </button>
+</nav>
+
+<main class="main">
+
+  <!-- ══════════════════════════════════════════════════════════
+       REGISTER TAB
+       ══════════════════════════════════════════════════════════ -->
+  <div id="view-register" class="view active">
+
+    <!-- Mode toggle -->
+    <div class="mode-row">
+      <div class="mode-btn active" id="mode-single" onclick="setMode('single')">
+        <i class="ti ti-barcode"></i> Single
+      </div>
+      <div class="mode-btn" id="mode-batch" onclick="setMode('batch')">
+        <i class="ti ti-stack"></i> Batch
+      </div>
+    </div>
+
+    <!-- ── Scanner shell ─────────────────────────────────── -->
+    <div class="scanner-shell">
+
+      <!-- Idle state -->
+      <div class="scan-idle" id="scan-idle" onclick="startScan()">
+        <div class="scan-frame">
+          <div class="corner corner-tl"></div>
+          <div class="corner corner-tr"></div>
+          <div class="corner corner-bl"></div>
+          <div class="corner corner-br"></div>
+        </div>
+        <p>Tap to open camera</p>
+      </div>
+
+      <!-- Live camera -->
+      <video id="cam-video" playsinline muted></video>
+
+      <!-- Scan overlay: mask + box + laser + status -->
+      <div class="scan-overlay" id="scan-overlay">
+        <div class="scan-mask-top"></div>
+        <div class="scan-mask-bottom"></div>
+        <div class="scan-mask-left"></div>
+        <div class="scan-mask-right"></div>
+        <div class="scan-box">
+          <div class="bc2"></div>
+          <div class="scan-laser"></div>
+        </div>
+        <div class="scan-status" id="scan-status"></div>
+      </div>
+
+    </div><!-- /scanner-shell -->
+
+    <!-- Camera controls -->
+    <div class="scan-controls">
+      <button class="btn btn-ghost" id="btn-open"  onclick="startScan()">
+        <i class="ti ti-scan"></i> Open Camera
+      </button>
+      <button class="btn btn-ghost" id="btn-close" onclick="stopScan()" style="display:none">
+        <i class="ti ti-x"></i> Close Camera
+      </button>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         SINGLE MODE FORM
+         ══════════════════════════════════════════════════════ -->
+    <div id="panel-single">
+      <div class="card">
+
+        <div class="fg">
+          <label>Serial Number (S/N) <span class="req">*</span></label>
+          <input type="text" id="sn-single" class="mono"
+                 placeholder="Scan or type S/N"/>
+        </div>
+
+        <div class="fg">
+          <label>Service Order (SO) <span class="req">*</span></label>
+          <input type="number" id="so-single" placeholder="e.g. 100123" min="1" step="1"/>
+        </div>
+
+        <div class="fg">
+          <label>Model</label>
+          <select id="model-single">
+            <option value="">Select model</option>
+            <option>VPOS Onyx</option>
+            <option>VPOS Touch</option>
+            <option>Cashless Mini</option>
+            <option>Monyx Wallet Reader</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Location <span class="req">*</span></label>
+          <input type="text" id="loc-single"
+                 placeholder="e.g. Laundromat Burleigh Heads — M3"/>
+        </div>
+
+        <div class="fg">
+          <label>Status</label>
+          <select id="status-single">
+            <option value="installed">Installed</option>
+            <option value="stock">In Stock</option>
+            <option value="fault">Fault</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input type="text" id="notes-single"
+                 placeholder="e.g. V00 boot error, awaiting replacement"/>
+        </div>
+
+        <button class="btn btn-primary" style="margin-top:4px" onclick="saveSingle()">
+          <i class="ti ti-device-floppy"></i> Save Device
+        </button>
+
+      </div>
+    </div><!-- /panel-single -->
+
+    <!-- ══════════════════════════════════════════════════════
+         BATCH MODE PANEL
+         ══════════════════════════════════════════════════════ -->
+    <div id="panel-batch" style="display:none">
+
+      <!-- Scanned queue -->
+      <div class="batch-queue">
+        <div class="batch-hdr">
+          <span>Scanned S/Ns</span>
+          <span class="count" id="batch-count">0 items</span>
+        </div>
+        <div class="batch-list" id="batch-list">
+          <div class="batch-empty">
+            No S/Ns scanned yet.<br>Open the camera and scan each device.
+          </div>
+        </div>
+      </div>
+
+      <!-- Common fields -->
+      <div class="divider">Common info for all scanned devices</div>
+
+      <div class="card">
+
+        <div class="fg">
+          <label>Service Order (SO) <span class="req">*</span></label>
+          <input type="number" id="so-batch" placeholder="e.g. 100123" min="1" step="1"/>
+        </div>
+
+        <div class="fg">
+          <label>Model</label>
+          <select id="model-batch">
+            <option value="">Select model</option>
+            <option>VPOS Onyx</option>
+            <option>VPOS Touch</option>
+            <option>Cashless Mini</option>
+            <option>Monyx Wallet Reader</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Location / Client <span class="req">*</span></label>
+          <input type="text" id="loc-batch"
+                 placeholder="e.g. Laundromat Burleigh Heads"/>
+        </div>
+
+        <div class="fg">
+          <label>Status</label>
+          <select id="status-batch">
+            <option value="installed">Installed</option>
+            <option value="stock">In Stock</option>
+            <option value="fault">Fault</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <input type="text" id="notes-batch"
+                 placeholder="e.g. New installation batch for client X"/>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn btn-danger btn-sm" style="flex:1" onclick="clearBatch()">
+            <i class="ti ti-trash"></i> Clear
+          </button>
+          <button class="btn btn-primary" style="flex:2" onclick="saveBatch()">
+            <i class="ti ti-device-floppy"></i>
+            Save All (<span id="batch-save-count">0</span>)
+          </button>
+        </div>
+
+      </div>
+
+    </div><!-- /panel-batch -->
+
+  </div><!-- /view-register -->
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       INVENTORY TAB
+       ══════════════════════════════════════════════════════════ -->
+  <div id="view-inventory" class="view">
+
+    <div class="stats" id="stats"></div>
+
+    <button class="export-btn" onclick="exportCSV()">
+      <i class="ti ti-download"></i> Export CSV
+    </button>
+
+    <div class="search-wrap">
+      <i class="ti ti-search ico"></i>
+      <input type="text" id="search"
+             placeholder="Search by S/N, location or SO…"
+             oninput="renderList()"/>
+    </div>
+
+    <div class="filters">
+      <button class="f-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="f-btn" onclick="setFilter('installed',this)">Installed</button>
+      <button class="f-btn" onclick="setFilter('stock',this)">In Stock</button>
+      <button class="f-btn" onclick="setFilter('fault',this)">Fault</button>
+    </div>
+
+    <div id="device-list"></div>
+
+  </div><!-- /view-inventory -->
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- ZXing: fallback barcode engine for Safari / browsers without BarcodeDetector -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"
+        onerror="console.warn('ZXing unavailable — native BarcodeDetector will be used only')">
+</script>
+<script src="script.js"></script>
+</body>
+</html>
